@@ -22,7 +22,7 @@ type rebalanceJob struct {
 func (rj *rebalanceJob) Start(ctx context.Context) (chan<- error, error) {
 	errCh := make(chan error)
 
-	// 1. Start rebalancer process.
+	// Start rebalancer process.
 	rj.eg.Go(func() error {
 
 		// 2. download tar gz file

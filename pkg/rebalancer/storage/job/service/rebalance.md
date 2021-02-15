@@ -88,21 +88,24 @@ func (rj *rebalanceJob) Start(ctx context.Context) (chan<- error, error) {
 	rj.eg.Go(func() error {
 
 		// Download tar gz file
-        rj.eg.Go(safety.RecoverFunc(func() error {
+        rj.eg.Go(safety.RecoverFunc(func() (err error) {
 			defer pw.Close()
+			defer func() {
+				if err != nil {
+					errCh <- err
+				}
+			}()
 
             // 外部ストレージからtarデータをダウンロードするために、Readerを生成する
 			sr, err := rj.storage.Reader(ctx)
 			if err != nil {
-				errCh <- err
-				return nil
+				return err
 			}
 
             // contextキャンセルに対応するために、キャンセル可能ReadCloserを生成する
 			sr, err = ctxio.NewReadCloserWithContext(ctx, sr)
 			if err != nil {
-				errCh <- err
-				return nil
+				return err
 			}
 			defer func() {
                 // Readerは開いたあとにCloseする必要があるので、Closeメソッドを読む
@@ -115,8 +118,7 @@ func (rj *rebalanceJob) Start(ctx context.Context) (chan<- error, error) {
 			// srから読み込んだtarデータは順次パイプのpwに送る（pwが書き込まれたらprから読み出すことができる）
 			_, err = io.Copy(pw, sr)
 			if err != nil {
-				errCh <- err
-				return nil
+				return err
 			}
 
 			return nil
@@ -194,7 +196,9 @@ func (r *rebalance) loadKVS(ctx context.Context, reader io.Reader) (idm map[stri
 		if err != nil {
 			if err == io.EOF {
 				// io.EOFが来たら、returnする
-				return
+				// if err != nilのときにはerrを返しても良さそう？
+				// 215行目で説明する内容にはなるが、kvsDBNameが取得できずにio.EOFが来た場合、tar内部にkvsdbファイルがないことなのでエラーでも良さそう？
+				return nil, nil
 			}
 
 			// 取得にエラーがあった場合は早期にReturnする

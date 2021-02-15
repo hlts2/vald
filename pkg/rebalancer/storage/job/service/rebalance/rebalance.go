@@ -37,7 +37,6 @@ func (r *rebalance) Start(ctx context.Context) (chan<- error, error) {
 	r.eg.Go(func() error {
 		defer pr.Close()
 
-		// 2. download tar gz file
 		r.eg.Go(safety.RecoverFunc(func() error {
 			defer pw.Close()
 
@@ -68,14 +67,11 @@ func (r *rebalance) Start(ctx context.Context) (chan<- error, error) {
 			return nil
 		}))
 
-		// 3. unpacka tar file
-		// 4. decode vcache filea to get vector ids.
 		idm, err := r.loadKVS(ctx, pr)
 		if err != nil {
 			errCh <- err
 			return nil
 		}
-
 		_ = idm
 
 		// 5. calculate to process data from vector ids.

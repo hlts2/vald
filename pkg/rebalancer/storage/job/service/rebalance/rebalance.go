@@ -37,19 +37,22 @@ func (r *rebalance) Start(ctx context.Context) (chan<- error, error) {
 	r.eg.Go(func() error {
 		defer pr.Close()
 
-		r.eg.Go(safety.RecoverFunc(func() error {
+		r.eg.Go(safety.RecoverFunc(func() (err error) {
 			defer pw.Close()
+			defer func() {
+				if err != nil {
+					errCh <- err
+				}
+			}()
 
 			sr, err := r.storage.Reader(ctx)
 			if err != nil {
-				errCh <- err
-				return nil
+				return err
 			}
 
 			sr, err = ctxio.NewReadCloserWithContext(ctx, sr)
 			if err != nil {
-				errCh <- err
-				return nil
+				return err
 			}
 			defer func() {
 				e := sr.Close()
@@ -60,8 +63,7 @@ func (r *rebalance) Start(ctx context.Context) (chan<- error, error) {
 
 			_, err = io.Copy(pw, sr)
 			if err != nil {
-				errCh <- err
-				return nil
+				return err
 			}
 
 			return nil

@@ -1,4 +1,4 @@
-package service
+package storage
 
 import (
 	"context"
@@ -35,9 +35,9 @@ type bs struct {
 	compressor compress.Compressor
 }
 
-func NewStorage(opts ...StorageOption) (Storage, error) {
+func New(opts ...Option) (Storage, error) {
 	b := new(bs)
-	for _, opt := range append(defaultStorageOptions, opts...) {
+	for _, opt := range append(defaultOptions, opts...) {
 		if err := opt(b); err != nil {
 			return nil, errors.ErrOptionFailed(err, reflect.ValueOf(opt))
 		}

@@ -1,4 +1,4 @@
-package service
+package rebalance
 
 import (
 	"archive/tar"
@@ -10,22 +10,23 @@ import (
 	ctxio "github.com/vdaas/vald/internal/io"
 	"github.com/vdaas/vald/internal/log"
 	"github.com/vdaas/vald/internal/safety"
+	"github.com/vdaas/vald/pkg/rebalancer/storage/job/service/storage"
 )
 
 const (
 	kvsDBName = "ngt-meta.kvsdb"
 )
 
-type RebalanceJob interface {
+type Rebalance interface {
 	Start(ctx context.Context) (chan<- error, error)
 }
 
-type rebalanceJob struct {
-	storage Storage
+type rebalance struct {
+	storage storage.Storage
 	eg      errgroup.Group
 }
 
-func (rj *rebalanceJob) Start(ctx context.Context) (chan<- error, error) {
+func (r *rebalance) Start(ctx context.Context) (chan<- error, error) {
 	errCh := make(chan error)
 
 	pr, pw := io.Pipe()
@@ -33,14 +34,14 @@ func (rj *rebalanceJob) Start(ctx context.Context) (chan<- error, error) {
 	// NOTE: think about error handling
 
 	// 1. Start rebalancer process.
-	rj.eg.Go(func() error {
+	r.eg.Go(func() error {
 		defer pr.Close()
 
 		// 2. download tar gz file
-		rj.eg.Go(safety.RecoverFunc(func() error {
+		r.eg.Go(safety.RecoverFunc(func() error {
 			defer pw.Close()
 
-			sr, err := rj.storage.Reader(ctx)
+			sr, err := r.storage.Reader(ctx)
 			if err != nil {
 				errCh <- err
 				return nil
@@ -69,7 +70,7 @@ func (rj *rebalanceJob) Start(ctx context.Context) (chan<- error, error) {
 
 		// 3. unpacka tar file
 		// 4. decode vcache filea to get vector ids.
-		idm, err := rj.unpackKVSDB(ctx, pr)
+		idm, err := r.loadKVS(ctx, pr)
 		if err != nil {
 			errCh <- err
 			return nil
@@ -88,8 +89,8 @@ func (rj *rebalanceJob) Start(ctx context.Context) (chan<- error, error) {
 	return errCh, nil
 }
 
-func (rj *rebalanceJob) unpackKVSDB(ctx context.Context, r io.Reader) (map[string]uint32, error) {
-	tr := tar.NewReader(r)
+func (r *rebalance) loadKVS(ctx context.Context, reader io.Reader) (idm map[string]uint32, err error) {
+	tr := tar.NewReader(reader)
 
 	for {
 		select {
@@ -98,10 +99,11 @@ func (rj *rebalanceJob) unpackKVSDB(ctx context.Context, r io.Reader) (map[strin
 		default:
 		}
 
-		header, err := tr.Next()
+		var header *tar.Header
+		header, err = tr.Next()
 		if err != nil {
 			if err == io.EOF {
-				break
+				return
 			}
 
 			return nil, err
@@ -125,7 +127,4 @@ func (rj *rebalanceJob) unpackKVSDB(ctx context.Context, r io.Reader) (map[strin
 			return idm, nil
 		}
 	}
-
-	// should we return err
-	return nil, nil
 }

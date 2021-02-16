@@ -166,7 +166,7 @@ func (rj *rebalanceJob) Start(ctx context.Context) (chan<- error, error) {
 		idm, err := r.loadKVS(ctx, pr)
 		if err != nil {
 			errCh <- err
-			return nil
+			return err
 		}
 		
 		// Calculate to process data from the above data
@@ -240,4 +240,3 @@ func (r *rebalance) loadKVS(ctx context.Context, reader io.Reader) (idm map[stri
 #### Calculate to process data from the above data
 
 #### Rebalance
-

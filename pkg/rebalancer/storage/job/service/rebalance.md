@@ -66,7 +66,7 @@ func (rj *rebalanceJob) Start(ctx context.Context) (chan<- error, error) {
 
 #### Load configuration
 
-Skip
+Skip 説明は共有済み
 
 #### Download tar gz file
 
@@ -240,5 +240,4 @@ func (r *rebalance) loadKVS(ctx context.Context, reader io.Reader) (idm map[stri
 #### Calculate to process data from the above data
 
 #### Rebalance
-
 

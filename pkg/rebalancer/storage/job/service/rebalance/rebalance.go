@@ -30,12 +30,12 @@ func (r *rebalance) Start(ctx context.Context) (chan<- error, error) {
 	errCh := make(chan error)
 
 	pr, pw := io.Pipe()
+	defer pr.Close()
 
 	// NOTE: think about error handling
 
 	// 1. Start rebalancer process.
 	r.eg.Go(func() error {
-		defer pr.Close()
 
 		r.eg.Go(safety.RecoverFunc(func() (err error) {
 			defer pw.Close()

@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/vdaas/vald/internal/errgroup"
+	"github.com/vdaas/vald/internal/errors"
 	ctxio "github.com/vdaas/vald/internal/io"
 	"github.com/vdaas/vald/internal/log"
 	"github.com/vdaas/vald/internal/safety"
@@ -41,7 +42,11 @@ func (r *rebalance) Start(ctx context.Context) (chan<- error, error) {
 			defer pw.Close()
 			defer func() {
 				if err != nil {
-					errCh <- err
+					select {
+					case <-ctx.Done():
+						errCh <- errors.Wrap(err, ctx.Err().Error())
+					case errCh <- err:
+					}
 				}
 			}()
 
@@ -71,8 +76,11 @@ func (r *rebalance) Start(ctx context.Context) (chan<- error, error) {
 
 		idm, err := r.loadKVS(ctx, pr)
 		if err != nil {
-			errCh <- err
-			return nil
+			select {
+			case <-ctx.Done():
+				errCh <- errors.Wrap(err, ctx.Err().Error())
+			case errCh <- err:
+			}
 		}
 		_ = idm
 

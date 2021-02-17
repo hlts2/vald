@@ -6,6 +6,8 @@ import (
 	"encoding/gob"
 	"io"
 
+	"github.com/vdaas/vald/apis/grpc/v1/payload"
+	"github.com/vdaas/vald/internal/client/v1/client"
 	"github.com/vdaas/vald/internal/errgroup"
 	"github.com/vdaas/vald/internal/errors"
 	ctxio "github.com/vdaas/vald/internal/io"
@@ -25,6 +27,8 @@ type Rebalance interface {
 type rebalance struct {
 	storage storage.Storage
 	eg      errgroup.Group
+
+	client client.Client
 }
 
 func (r *rebalance) Start(ctx context.Context) (chan<- error, error) {
@@ -81,14 +85,35 @@ func (r *rebalance) Start(ctx context.Context) (chan<- error, error) {
 				errCh <- errors.Wrap(err, ctx.Err().Error())
 			case errCh <- err:
 			}
+			return err
 		}
-		_ = idm
 
 		// 5. calculate to process data from vector ids.
+		// TODO:
 
 		// 6. send request for getting vector.
-
 		// 7. send request for updateing vector.
+		for uid := range idm {
+			resp, err := r.client.GetObject(ctx, &payload.Object_VectorRequest{
+				Id: &payload.Object_ID{
+					Id: uid,
+				},
+			})
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+
+			_, err = r.client.Update(ctx, &payload.Update_Request{
+				Vector: &payload.Object_Vector{
+					Id:     resp.GetId(),
+					Vector: resp.GetVector(),
+				},
+			})
+			if err != nil {
+				log.Error(err)
+			}
+		}
 		return nil
 	})
 

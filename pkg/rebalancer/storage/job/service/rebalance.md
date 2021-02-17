@@ -93,7 +93,11 @@ func (rj *rebalanceJob) Start(ctx context.Context) (chan<- error, error) {
 			defer pw.Close()
 			defer func() {
 				if err != nil {
-					errCh <- err
+					select {
+					case <-ctx.Done():
+						errCh <- errors.Wrap(err, ctx.Err().Error())
+					case errCh <- err:
+					}
 				}
 			}()
 			
@@ -165,8 +169,12 @@ func (rj *rebalanceJob) Start(ctx context.Context) (chan<- error, error) {
 		// Decode kvsdb file to get vector ids
 		idm, err := r.loadKVS(ctx, pr)
 		if err != nil {
-			errCh <- err
-			return err
+			select {
+			case <-ctx.Done():
+				// loadKVSでcontext.Errが返ってきたら重複してwrapされるので別途考えた方がいいかもしれない
+				errCh <- errors.Wrap(err, ctx.Err().Error())
+			case errCh <- err:
+			}
 		}
 		
 		// Calculate to process data from the above data
